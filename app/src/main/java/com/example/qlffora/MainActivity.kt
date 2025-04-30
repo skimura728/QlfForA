@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -64,10 +65,28 @@ fun NewsArticleElement(
                         .padding(8.dp)
                         .width(200.dp)
                 ) {
+                    //Thumbnail
+                    news.thumbnail?.let { url ->
+                        AsyncImage(
+                            model = url,
+                            contentDescription = "Thumbnail",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                        )
+                    }
+                    //Title
                     Text(
-                        news.title,
+                        text = news.title,
                         fontWeight = FontWeight.Bold,
-                        fontSize = MaterialTheme.typography.bodySmall.fontSize
+                        fontSize = MaterialTheme.typography.bodySmall.fontSize,
+                        maxLines = 3
+                    )
+                    //Published Day
+                    Text(
+                        text = news.published,
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                        color = Color.Gray
                     )
                 }
             }
