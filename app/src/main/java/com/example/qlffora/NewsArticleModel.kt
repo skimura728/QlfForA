@@ -13,6 +13,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 
 typealias CategoryNewsMap = Map<String, List<NewsArticle>>
@@ -79,6 +81,17 @@ class NewsArticleModel {
         } catch (e: Exception) {
             println("Error fetching news for category $category: ${e.localizedMessage}")
             emptyList()
+        }
+    }
+
+    suspend fun getSummary(link: String): String {
+        val encodedUrl = java.net.URLEncoder.encode(link, "UTF-8")
+        val response = client.get("https://quicklearnfeed.onrender.com/api/scrape?url=$encodedUrl")
+        if (response.status == HttpStatusCode.OK) {
+            val json = Json.parseToJsonElement(response.bodyAsText())
+            return json.jsonObject["summary"]?.jsonPrimitive?.content ?: "No summary available."
+        } else {
+            throw Exception("HTTP ${response.status}")
         }
     }
 }

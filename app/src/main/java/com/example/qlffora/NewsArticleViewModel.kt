@@ -13,6 +13,8 @@ class NewsArticleViewModel : ViewModel() {
     private val newsArticleModel = NewsArticleModel()
     private val newsArticles: MutableStateFlow<CategoryNewsMap?> =
         MutableStateFlow<CategoryNewsMap?>(emptyMap())
+    val selectedArticle = MutableStateFlow<NewsArticle?>(null)
+    val summaryUiState = MutableStateFlow<SummaryUiState>(SummaryUiState.Idle)
 
     init {
         viewModelScope.launch {
@@ -22,16 +24,27 @@ class NewsArticleViewModel : ViewModel() {
 
     val uiState: StateFlow<NewsUiState> = newsArticles
         .map { news ->
-        if (news == null) {
-            NewsUiState.Loading
-        } else {
-            NewsUiState.Success(newsArticles = news)
+        if (news == null) NewsUiState.Loading
+        else NewsUiState.Success(newsArticles = news)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = NewsUiState.Loading
+        )
+
+    fun selectArticleWithSummary(article: NewsArticle) {
+        selectedArticle.value = article
+        summaryUiState.value = SummaryUiState.Loading
+
+        viewModelScope.launch {
+            try {
+                val summary = newsArticleModel.getSummary(article.link)
+                summaryUiState.value = SummaryUiState.Success(summary)
+            } catch (e: Exception) {
+                summaryUiState.value = SummaryUiState.Error("Failed to load summary.")
+            }
         }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = NewsUiState.Loading
-    )
+    }
 }
 
 sealed interface NewsUiState {
@@ -39,4 +52,11 @@ sealed interface NewsUiState {
     data class Success(
         val newsArticles: CategoryNewsMap
     ): NewsUiState
+}
+
+sealed interface SummaryUiState {
+    data object Idle : SummaryUiState
+    data object Loading : SummaryUiState
+    data class Success(val summary: String) : SummaryUiState
+    data class Error(val message: String) : SummaryUiState
 }
