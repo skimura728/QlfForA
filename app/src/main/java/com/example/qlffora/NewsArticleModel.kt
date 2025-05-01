@@ -1,4 +1,6 @@
 package com.example.qlffora
+
+import com.example.qlffora.util.logDebug
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -41,7 +43,7 @@ class NewsArticleModel {
         val categories: List<String> = client
             .get("https://quicklearnfeed.onrender.com/api/categories")
             .body()
-        println("Get News Categories: $categories")
+        logDebug("Get News Categories: $categories")
 
         return coroutineScope {
             val deferredMap = categories.associateWith { category ->
@@ -54,7 +56,7 @@ class NewsArticleModel {
                 }
             }
             val resultMap = deferredMap.mapValues { it.value.await() }
-            println ("Get News: $resultMap")
+            logDebug ("Get News: $resultMap")
             resultMap
         }
     }
@@ -63,23 +65,23 @@ class NewsArticleModel {
         return try {
             val response: HttpResponse = client
                 .get("https://quicklearnfeed.onrender.com/api/news/$category")
-            println("Status for $category: ${response.status}")
+            logDebug("Status for $category: ${response.status}")
 
             if (response.status == HttpStatusCode.OK) {
                 val rawText = response.bodyAsText()
-                println("RAW JSON for $category: $rawText")
+                logDebug("RAW JSON for $category: $rawText")
 
                 val articles: List<NewsArticle> = Json.decodeFromString(
                     ListSerializer(NewsArticle.serializer()),
                     rawText)
-                println("Fetched ${articles.size} articles for category: $category")
+                logDebug("Fetched ${articles.size} articles for category: $category")
                 articles
             } else {
-                println("Non-OK status for $category: ${response.status}")
+                logDebug("Non-OK status for $category: ${response.status}")
                 emptyList()
             }
         } catch (e: Exception) {
-            println("Error fetching news for category $category: ${e.localizedMessage}")
+            logDebug("Error fetching news for category $category: ${e.localizedMessage}")
             emptyList()
         }
     }
