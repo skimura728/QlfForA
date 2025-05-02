@@ -15,6 +15,10 @@ class NewsArticleViewModel : ViewModel() {
         MutableStateFlow<CategoryNewsMap?>(emptyMap())
     val selectedArticle = MutableStateFlow<NewsArticle?>(null)
     val summaryUiState = MutableStateFlow<SummaryUiState>(SummaryUiState.Idle)
+    private val _selectedWordMeaning = MutableStateFlow<WordMeaning?>(null)
+    val selectedWordMeaning: StateFlow<WordMeaning?> = _selectedWordMeaning
+    private val _isLearningMode = MutableStateFlow(false)
+    val isLearningMode: StateFlow<Boolean> = _isLearningMode
 
     init {
         viewModelScope.launch {
@@ -44,6 +48,27 @@ class NewsArticleViewModel : ViewModel() {
                 summaryUiState.value = SummaryUiState.Error("Failed to load summary.")
             }
         }
+    }
+
+    fun lookupWordMeaning(word: String) {
+        _selectedWordMeaning.value = WordMeaning(word, "Loading...")
+
+        viewModelScope.launch {
+            try {
+                val meaning = newsArticleModel.getMeaning(word)
+                _selectedWordMeaning.value = WordMeaning(word, meaning)
+            } catch (e: Exception) {
+                _selectedWordMeaning.value = WordMeaning(word, "Failed to fetch meaning.")
+            }
+        }
+    }
+
+    fun clearSelectedWord() {
+        _selectedWordMeaning.value = null
+    }
+
+    fun toggleLearningMode() {
+        _isLearningMode.value = !_isLearningMode.value
     }
 }
 

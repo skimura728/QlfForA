@@ -15,6 +15,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -28,6 +29,11 @@ data class NewsArticle(
     val published: String,
     val category: String,
     val link: String
+)
+
+data class WordMeaning(
+    val word: String,
+    val meaning: String
 )
 
 class NewsArticleModel {
@@ -94,6 +100,27 @@ class NewsArticleModel {
             return json.jsonObject["summary"]?.jsonPrimitive?.content ?: "No summary available."
         } else {
             throw Exception("HTTP ${response.status}")
+        }
+    }
+
+    suspend fun getMeaning(word: String): String {
+        val encoded = java.net.URLEncoder.encode(word, "UTF-8")
+        val response = client.get("https://api.dictionaryapi.dev/api/v2/entries/en/$encoded")
+
+        if (response.status == HttpStatusCode.OK) {
+            val json = Json.parseToJsonElement(response.bodyAsText())
+            val meanings = json
+                .jsonArray[0]
+                .jsonObject["meanings"]
+                ?.jsonArray?.getOrNull(0)
+                ?.jsonObject?.get("definitions")
+                ?.jsonArray?.getOrNull(0)
+                ?.jsonObject?.get("definition")
+                ?.jsonPrimitive?.content
+
+            return meanings ?: "No definition found."
+        } else {
+            throw Exception("Failed with status ${response.status}")
         }
     }
 }

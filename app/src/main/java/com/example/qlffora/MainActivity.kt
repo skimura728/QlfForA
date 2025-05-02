@@ -10,8 +10,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,25 +24,104 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.qlffora.ui.theme.QlfForATheme
 import coil.compose.AsyncImage
-import kotlinx.coroutines.launch
+
+@Composable
+fun WrappingRow(
+    modifier: Modifier = Modifier,
+    spacing: Dp = 4.dp,
+    content: @Composable () -> Unit
+) {
+    Layout(
+        content = content,
+        modifier = modifier
+    ) { measurables, constraints ->
+        val rowConstraints = constraints.copy(minWidth = 0)
+        val placeables = measurables.map { it.measure(rowConstraints) }
+
+        val rows = mutableListOf<List<Placeable>>()
+        var currentRow = mutableListOf<Placeable>()
+        var currentWidth = 0
+        val maxWidth = constraints.maxWidth
+        val spacingPx = spacing.roundToPx()
+
+        for (placeable in placeables) {
+            if (currentWidth + placeable.width > maxWidth && currentRow.isNotEmpty()) {
+                rows.add(currentRow)
+                currentRow = mutableListOf()
+                currentWidth = 0
+            }
+            currentRow.add(placeable)
+            currentWidth += placeable.width + spacingPx
+        }
+        if (currentRow.isNotEmpty()) rows.add(currentRow)
+
+        val height = rows.sumOf { row -> row.maxOf { it.height } } + spacingPx * (rows.size - 1)
+
+        layout(maxWidth, height) {
+            var yOffset = 0
+            for (row in rows) {
+                var xOffset = 0
+                val rowHeight = row.maxOf { it.height }
+                for (placeable in row) {
+                    placeable.placeRelative(xOffset, yOffset)
+                    xOffset += placeable.width + spacingPx
+                }
+                yOffset += rowHeight + spacingPx
+            }
+        }
+    }
+}
+
+@Composable
+fun SelectableTextWords(
+    text: String,
+    onWordLongPress: (String) -> Unit,
+    style: TextStyle = MaterialTheme.typography.bodySmall,
+    maxLines: Int = Int.MAX_VALUE
+) {
+    val words = text.split(" ")
+
+    WrappingRow(
+        modifier = Modifier.fillMaxWidth(),
+        spacing = 4.dp
+    ) {
+        words.forEach { word ->
+            Text(
+                text = word,
+                style = style,
+                maxLines = maxLines,
+                modifier = Modifier
+                    .background(Color.White)
+                    .padding(4.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = {
+                                val clean = word.trim(',', '.', '?', '!', ':', ';')
+                                onWordLongPress(clean)
+                            }
+                        )
+                    }
+            )
+        }
+    }
+}
 
 @Composable
 fun NewsArticleElement(
@@ -115,7 +196,12 @@ fun NewsArticleScreen(
     uiState: NewsUiState,
     selectedArticle: NewsArticle?,
     summaryUiState: SummaryUiState,
-    onArticleClick: (NewsArticle) -> Unit
+    wordMeaning: WordMeaning?,
+    isLearningMode: Boolean,
+    onArticleClick: (NewsArticle) -> Unit,
+    onDismissDialog: () -> Unit,
+    onWordLongPress: (String) -> Unit,
+    onToggleLearningMode: () -> Unit
 ) {
     Scaffold(modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -139,6 +225,9 @@ fun NewsArticleScreen(
                     .fillMaxWidth()
                     .background(Color(0xFFE0E0E0))
                     .padding(12.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = { onToggleLearningMode() })
+                    }
             ) {
                 AnimatedContent(
                     targetState = selectedArticle,
@@ -152,26 +241,44 @@ fun NewsArticleScreen(
                         )
                     } else {
                         Column {
-                            Text(
-                                text = article.title,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                            if (isLearningMode) {
+                                SelectableTextWords(
+                                    text = article.title,
+                                    onWordLongPress = onWordLongPress,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2
+                                )
+                            } else {
+                                Text(
+                                    text = article.title,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                             when (summaryUiState) {
                                 is SummaryUiState.Loading -> Text("Loading summary...")
-                                is SummaryUiState.Success -> Text(
-                                    summaryUiState.summary,
-                                    maxLines = 3,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-
+                                is SummaryUiState.Success -> {
+                                    if (isLearningMode) {
+                                        SelectableTextWords(
+                                            text = summaryUiState.summary,
+                                            onWordLongPress = onWordLongPress,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 3
+                                        )
+                                    } else {
+                                        Text(
+                                            summaryUiState.summary,
+                                            maxLines = 3,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
                                 is SummaryUiState.Error -> Text(
                                     summaryUiState.message,
                                     color = Color.Red,
                                     style = MaterialTheme.typography.bodySmall
                                 )
-
                                 SummaryUiState.Idle -> {}
                             }
                         }
@@ -199,11 +306,24 @@ fun NewsArticleScreen(
                             NewsArticleElement(
                                 category = category,
                                 articles = articles,
-                                onClick = onArticleClick)
+                                onClick = onArticleClick
+                            )
                         }
                     }
                 }
             }
+        }
+        if (wordMeaning != null) {
+            AlertDialog(
+                onDismissRequest = onDismissDialog,
+                title = { Text(text = wordMeaning.word)},
+                text = { Text(text = wordMeaning.meaning)},
+                confirmButton = {
+                    TextButton(onClick = onDismissDialog) {
+                        Text("OK")
+                    }
+                }
+            )
         }
     }
 }
@@ -213,12 +333,19 @@ fun NewsArticleRoute(viewModel: NewsArticleViewModel = viewModel()){
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedArticle by viewModel.selectedArticle.collectAsState()
     val summaryUiState by viewModel.summaryUiState.collectAsState()
+    val wordMeaning by viewModel.selectedWordMeaning.collectAsState()
+    val isLearningMode by viewModel.isLearningMode.collectAsState()
 
     NewsArticleScreen(
         uiState = uiState,
         selectedArticle = selectedArticle,
         summaryUiState = summaryUiState,
-        onArticleClick = {viewModel.selectArticleWithSummary(it)}
+        wordMeaning = wordMeaning,
+        isLearningMode = isLearningMode,
+        onArticleClick = { viewModel.selectArticleWithSummary(it) },
+        onDismissDialog = { viewModel.clearSelectedWord() },
+        onWordLongPress = { viewModel.lookupWordMeaning(it) },
+        onToggleLearningMode = { viewModel.toggleLearningMode()}
     )
 }
 
