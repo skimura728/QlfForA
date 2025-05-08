@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -131,6 +132,7 @@ fun NewsArticleElement(
     onClick: (NewsArticle) -> Unit
 ){
     val context = LocalContext.current
+    val analytics = remember { Firebase.analytics }
     Column(modifier = Modifier.padding(8.dp)) {
         Text(
             text = category,
@@ -154,8 +156,21 @@ fun NewsArticleElement(
                         .width(200.dp)
                         .pointerInput(Unit) {
                             detectTapGestures(
-                                onTap = { onClick(news) },
+                                onTap = {
+                                    val bundle = Bundle().apply {
+                                        putString("title", news.title)
+                                        putString("category", category)
+                                    }
+                                    analytics.logEvent("news_tile_tap", bundle)
+                                    onClick(news)
+                                        },
                                 onDoubleTap = {
+                                    val bundle = Bundle().apply {
+                                        putString("title", news.title)
+                                        putString("link", news.link)
+                                    }
+                                    analytics.logEvent("double_tap_open_detail", bundle)
+
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(news.link))
                                     context.startActivity(intent)
                                 }

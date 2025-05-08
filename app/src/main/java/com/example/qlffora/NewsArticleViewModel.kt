@@ -1,5 +1,6 @@
 package com.example.qlffora
 
+import android.os.Bundle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,6 +9,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.analytics.ktx.analytics
+import com.google.firebase.ktx.Firebase
 
 class NewsArticleViewModel : ViewModel() {
     private val newsArticleModel = NewsArticleModel()
@@ -19,6 +23,8 @@ class NewsArticleViewModel : ViewModel() {
     val selectedWordMeaning: StateFlow<WordMeaning?> = _selectedWordMeaning
     private val _isLearningMode = MutableStateFlow(false)
     val isLearningMode: StateFlow<Boolean> = _isLearningMode
+
+    private val analytics = Firebase.analytics
 
     init {
         viewModelScope.launch {
@@ -37,6 +43,12 @@ class NewsArticleViewModel : ViewModel() {
         )
 
     fun selectArticleWithSummary(article: NewsArticle) {
+        val bundle = Bundle().apply {
+            putString("title", article.title)
+            putString("category", article.category)
+        }
+        analytics.logEvent("summary_expand", bundle)
+
         selectedArticle.value = article
         summaryUiState.value = SummaryUiState.Loading
 
@@ -51,6 +63,11 @@ class NewsArticleViewModel : ViewModel() {
     }
 
     fun lookupWordMeaning(word: String) {
+        val bundle = Bundle().apply {
+            putString("word", word)
+        }
+        analytics.logEvent("dictionary_open", bundle)
+
         _selectedWordMeaning.value = WordMeaning(word, "Loading...")
 
         viewModelScope.launch {
