@@ -4,6 +4,7 @@ import com.example.qlffora.util.logDebug
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.*
 import io.ktor.client.statement.HttpResponse
@@ -42,6 +43,12 @@ class NewsArticleModel {
             json(Json {
                 ignoreUnknownKeys = true
             })
+        }
+
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60000
+            connectTimeoutMillis = 30000
+            socketTimeoutMillis = 60000
         }
     }
 
